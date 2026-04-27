@@ -1,7 +1,7 @@
 """Constants for the SHLabs Sabiana Wifi integration."""
 
 DOMAIN = "shlabs_sabiana_wifi"
-PLATFORMS = ["climate", "switch"]
+PLATFORMS = ["climate", "switch", "sensor"]
 
 CONF_BASE_URL = "base_url"
 

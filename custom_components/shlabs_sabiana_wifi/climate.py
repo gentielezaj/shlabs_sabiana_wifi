@@ -26,7 +26,7 @@ from .const import (
 from .entity import (
     LAST_DATA_ACTION_BYTE,
     LAST_DATA_CURRENT_TEMP_BYTE,
-    LAST_DATA_FAN_BYTE,
+    LAST_DATA_FAN_STATUS_BYTE,
     LAST_DATA_MODE_BYTE,
     LAST_DATA_NIGHT_MODE_BYTE,
     LAST_DATA_POWER_BYTE,
@@ -62,10 +62,8 @@ FAN_COMMANDS = {
 
 
 def _format_fan_mode(level: float) -> str:
-    """Format a fan level without trailing .0."""
-    if level.is_integer():
-        return str(int(level))
-    return str(level)
+    """Format a fan level with 0.5 precision."""
+    return f"{level:.1f}"
 
 
 async def async_setup_entry(
@@ -144,7 +142,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
     @property
     def fan_mode(self) -> str | None:
         """Return current fan mode."""
-        fan_byte = byte_at(self._last_data, LAST_DATA_FAN_BYTE)
+        fan_byte = byte_at(self._last_data, LAST_DATA_FAN_STATUS_BYTE)
         if fan_byte is None:
             return None
 
@@ -171,6 +169,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
             "power_byte": byte_at(self._last_data, LAST_DATA_POWER_BYTE),
             "mode_byte": byte_at(self._last_data, LAST_DATA_MODE_BYTE),
             "action_byte": byte_at(self._last_data, LAST_DATA_ACTION_BYTE),
+            "fan_status_byte": byte_at(self._last_data, LAST_DATA_FAN_STATUS_BYTE),
             "secondary_target_temperature": parse_temperature(self._last_data, LAST_DATA_SECONDARY_TARGET_TEMP_BYTE),
             "water_temperature": parse_temperature(self._last_data, LAST_DATA_WATER_TEMP_BYTE),
             "limit_temperature": parse_temperature(self._last_data, LAST_DATA_LIMIT_TEMP_BYTE),
