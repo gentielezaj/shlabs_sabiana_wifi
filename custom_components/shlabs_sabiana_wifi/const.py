@@ -5,7 +5,7 @@ PLATFORMS = ["climate"]
 
 CONF_BASE_URL = "base_url"
 
-DEFAULT_NAME = "Sabiana Wifi Integration"
+DEFAULT_NAME = "SHLabs Sabiana WiFi"
 DEFAULT_SCAN_INTERVAL = 30
 DEFAULT_BASE_URL = "https://be-standard.sabianawm.cloud"
 

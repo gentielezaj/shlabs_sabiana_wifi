@@ -30,7 +30,7 @@ class SabianaDataUpdateCoordinator(DataUpdateCoordinator[SabianaCoordinatorData]
         super().__init__(
             hass,
             logger=_LOGGER,
-            name="Sabiana Wifi Integration",
+            name="SHLabs Sabiana WiFi",
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
         self.client = client

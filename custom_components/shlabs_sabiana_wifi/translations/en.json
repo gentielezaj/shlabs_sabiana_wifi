@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to Sabiana Wifi Integration",
-        "description": "Enter your Sabiana Wifi Integration account details.",
+        "title": "Connect to SHLabs Sabiana WiFi",
+        "description": "Enter your SHLabs Sabiana WiFi account details.",
         "data": {
           "base_url": "API base URL",
           "username": "Email",

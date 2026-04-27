@@ -1,9 +1,10 @@
 {
   "domain": "shlabs_sabiana_wifi",
-  "name": "Sabiana Wifi Integration",
+  "name": "SHLabs Sabiana WiFi",
   "codeowners": ["@gentielezaj"],
   "config_flow": true,
-  "documentation": "https://www.home-assistant.io/integrations/climate",
+  "documentation": "https://github.com/gentielezaj/shlabs_sabiana_wifi",
+  "issue_tracker": "https://github.com/gentielezaj/shlabs_sabiana_wifi/issues",
   "integration_type": "device",
   "iot_class": "cloud_polling",
   "loggers": ["custom_components.shlabs_sabiana_wifi"],

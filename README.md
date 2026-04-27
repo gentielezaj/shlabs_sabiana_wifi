@@ -1,11 +1,14 @@
-# Sabiana Wifi Integration
+# SHLabs Sabiana WiFi
 
-THIS IS GENERATED WITH AI, I DO NOT KNOW PYTHON...
+Custom Home Assistant integration for Sabiana fan coils that use the Sabiana cloud API.
 
+The integration authenticates against the Sabiana service, polls device state every 30 seconds, parses the `lastData` payload, and exposes each unit as a Home Assistant `climate` entity.
 
-This repository contains a custom Home Assistant integration for Sabiana fan coils.
+GitHub repository:
 
-It authenticates against Sabiana's cloud API, polls device state every 30 seconds, parses the `lastData` hex payload, and exposes each unit as a Home Assistant `climate` entity.
+```text
+https://github.com/gentielezaj/shlabs_sabiana_wifi
+```
 
 ## What This Integration Does
 
@@ -53,28 +56,48 @@ Main files:
 
 ## Installation
 
-Copy the `custom_components/shlabs_sabiana_wifi` folder into your Home Assistant configuration directory:
+### Install with HACS
+
+1. Open HACS in Home Assistant.
+2. Open the menu in the top right and choose `Custom repositories`.
+3. Add this repository URL:
 
 ```text
-config/custom_components/shlabs_sabiana_wifi/
+https://github.com/gentielezaj/shlabs_sabiana_wifi
 ```
 
-Then restart Home Assistant.
-
-After restart:
-
-1. Go to `Settings -> Devices & Services`
-2. Click `Add Integration`
-3. Search for `Sabiana Wifi Integration`
-4. Enter API base URL
-5. Enter email
-6. Enter password
+4. Select category `Integration`.
+5. Search for `SHLabs Sabiana WiFi` in HACS and install it.
+6. Restart Home Assistant.
+7. Go to `Settings -> Devices & Services`.
+8. Click `Add Integration`.
+9. Search for `SHLabs Sabiana WiFi`.
+10. Enter your API base URL, email, and password.
 
 Default base URL:
 
 ```text
 https://be-standard.sabianawm.cloud
 ```
+
+### Manual installation
+
+Copy the `custom_components/shlabs_sabiana_wifi` folder into your Home Assistant configuration directory:
+
+```text
+config/custom_components/shlabs_sabiana_wifi/
+```
+
+Restart Home Assistant, then add the integration from `Settings -> Devices & Services`.
+
+## Configuration
+
+1. Go to `Settings -> Devices & Services`.
+2. Click `Add Integration`.
+3. Search for `SHLabs Sabiana WiFi`.
+4. Enter API base URL.
+5. Enter email.
+6. Enter password.
 
 ## API Flow
 
