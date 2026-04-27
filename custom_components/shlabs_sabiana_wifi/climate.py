@@ -47,8 +47,8 @@ MODE_TO_HVAC = {
 
 HVAC_TO_MODE = {value: key for key, value in MODE_TO_HVAC.items()}
 
-COMMAND_SUFFIX = "FF00FFFF0000"
-FAN_SUFFIX = "030000FF00FFFF0000"
+COMMAND_SUFFIX = "FF00FFFF00"
+FAN_SUFFIX = "030000FF00FFFF00"
 FAN_AUTO_PREFIX = "04"
 
 
@@ -184,12 +184,13 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set the HVAC mode."""
+        night_mode = self.is_aux_heat
         if hvac_mode == HVACMode.OFF:
             await self.coordinator.client.async_send_command(self._device_id, OFF_COMMAND)
         elif hvac_mode == HVACMode.FAN_ONLY:
             await self.coordinator.client.async_send_command(
                 self._device_id,
-                _build_fan_command(self.fan_mode or "auto"),
+                _build_fan_command(self.fan_mode or "auto", night_mode=night_mode),
             )
         else:
             await self.coordinator.client.async_send_command(
@@ -198,6 +199,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
                     mode=HVAC_TO_MODE[hvac_mode],
                     target_temperature=self.target_temperature or 20.0,
                     fan_mode=self.fan_mode or "auto",
+                    night_mode=night_mode,
                 ),
             )
         await self.coordinator.async_request_refresh()
@@ -212,6 +214,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
                 mode=HVAC_TO_MODE[current_mode],
                 target_temperature=temperature,
                 fan_mode=self.fan_mode or "auto",
+                night_mode=self.is_aux_heat,
             ),
         )
         await self.coordinator.async_request_refresh()
@@ -220,22 +223,22 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         """Set a new fan level."""
         await self.coordinator.client.async_send_command(
             self._device_id,
-            _build_fan_command(fan_mode),
+            _build_fan_command(fan_mode, night_mode=self.is_aux_heat),
         )
         await self.coordinator.async_request_refresh()
 
 
-def _build_temperature_command(*, mode: str, target_temperature: float, fan_mode: str | float) -> str:
+def _build_temperature_command(*, mode: str, target_temperature: float, fan_mode: str | float, night_mode: bool) -> str:
     """Build a heat or cool command using calculated protocol values."""
     if mode not in (MODE_COOL, MODE_HEAT):
         raise ValueError(f"Unsupported mode for temperature command: {mode}")
 
-    return f"{_encode_fan_prefix(fan_mode)}{mode}{_encode_temperature(target_temperature)}{COMMAND_SUFFIX}"
+    return f"{_encode_fan_prefix(fan_mode)}{mode}{_encode_temperature(target_temperature)}{COMMAND_SUFFIX}{_encode_night_suffix(night_mode)}"
 
 
-def _build_fan_command(level: str | float) -> str:
+def _build_fan_command(level: str | float, night_mode: bool) -> str:
     """Build a fan command using calculated protocol values."""
-    return f"{_encode_fan_prefix(level)}{FAN_SUFFIX}"
+    return f"{_encode_fan_prefix(level)}{FAN_SUFFIX}{_encode_night_suffix(night_mode)}"
 
 
 def _encode_temperature(temperature: float) -> str:
@@ -251,6 +254,11 @@ def _encode_fan_prefix(level: str | float) -> str:
 
     normalized_level = _validate_half_step(float(level), minimum=1.0, maximum=10.0, label="Fan level")
     return f"{int(round(normalized_level * 10 + 10)):02X}"
+
+
+def _encode_night_suffix(enabled: bool) -> str:
+    """Encode the trailing byte for night mode state."""
+    return "02" if enabled else "00"
 
 
 def _validate_half_step(value: float, *, minimum: float, maximum: float, label: str) -> float:

@@ -3,10 +3,10 @@
 Examples:
     python functioncodes_calc.py heat 20 1
     python functioncodes_calc.py heat 20 3.5
-    python functioncodes_calc.py heat 20 auto
+    python functioncodes_calc.py heat 20 auto --night on
     python functioncodes_calc.py cool 21.5 1
     python functioncodes_calc.py cool 21.5 4.5
-    python functioncodes_calc.py cool 18.5 auto
+    python functioncodes_calc.py cool 18.5 auto --night on
     python functioncodes_calc.py fan 3.5
     python functioncodes_calc.py night on
     python functioncodes_calc.py off
@@ -23,8 +23,8 @@ FAN_MIN = 1.0
 FAN_MAX = 10.0
 STEP = 0.5
 
-COMMAND_SUFFIX = "FF00FFFF0000"
-FAN_SUFFIX = "030000FF00FFFF0000"
+COMMAND_SUFFIX = "FF00FFFF00"
+FAN_SUFFIX = "030000FF00FFFF00"
 FAN_AUTO_CODE = "04030000FF00FFFF0000"
 NIGHT_ON_CODE = "14030000FF00FFFF0002"
 NIGHT_OFF_CODE = "14030000FF00FFFF0000"
@@ -48,6 +48,11 @@ def _encode_temperature(temperature: float) -> str:
     return f"{int(round(temperature * 10)):04X}"
 
 
+def _encode_night_suffix(enabled: bool) -> str:
+    """Encode the trailing byte for night mode state."""
+    return "02" if enabled else "00"
+
+
 def _encode_fan_prefix(level: float | str) -> str:
     """Encode a fan speed or auto mode to the leading command byte."""
     if isinstance(level, str) and level.lower() == "auto":
@@ -58,21 +63,19 @@ def _encode_fan_prefix(level: float | str) -> str:
     return f"{int(round(numeric_level * 10 + 10)):02X}"
 
 
-def build_heat_code(temperature: float, fan_level: float | str = 1.0) -> str:
+def build_heat_code(temperature: float, fan_level: float | str = 1.0, *, night_mode: bool = False) -> str:
     """Return the heat command code for a target temperature and fan speed."""
-    return f"{_encode_fan_prefix(fan_level)}01{_encode_temperature(temperature)}{COMMAND_SUFFIX}"
+    return f"{_encode_fan_prefix(fan_level)}01{_encode_temperature(temperature)}{COMMAND_SUFFIX}{_encode_night_suffix(night_mode)}"
 
 
-def build_cool_code(temperature: float, fan_level: float | str = 1.0) -> str:
+def build_cool_code(temperature: float, fan_level: float | str = 1.0, *, night_mode: bool = False) -> str:
     """Return the cool command code for a target temperature and fan speed."""
-    return f"{_encode_fan_prefix(fan_level)}00{_encode_temperature(temperature)}{COMMAND_SUFFIX}"
+    return f"{_encode_fan_prefix(fan_level)}00{_encode_temperature(temperature)}{COMMAND_SUFFIX}{_encode_night_suffix(night_mode)}"
 
 
-def build_fan_code(level: float | str) -> str:
+def build_fan_code(level: float | str, *, night_mode: bool = False) -> str:
     """Return the fan command code for a fan speed."""
-    if _encode_fan_prefix(level) == "04":
-        return FAN_AUTO_CODE
-    return f"{_encode_fan_prefix(level)}{FAN_SUFFIX}"
+    return f"{_encode_fan_prefix(level)}{FAN_SUFFIX}{_encode_night_suffix(night_mode)}"
 
 
 def build_night_mode_code(enabled: bool) -> str:
@@ -92,13 +95,16 @@ def main() -> None:
     heat_parser = subparsers.add_parser("heat", help="Generate a heat code")
     heat_parser.add_argument("temperature", type=float)
     heat_parser.add_argument("fan_level", nargs="?", default=1.0)
+    heat_parser.add_argument("--night", choices=["on", "off"], default="off")
 
     cool_parser = subparsers.add_parser("cool", help="Generate a cool code")
     cool_parser.add_argument("temperature", type=float)
     cool_parser.add_argument("fan_level", nargs="?", default=1.0)
+    cool_parser.add_argument("--night", choices=["on", "off"], default="off")
 
     fan_parser = subparsers.add_parser("fan", help="Generate a fan code")
     fan_parser.add_argument("level")
+    fan_parser.add_argument("--night", choices=["on", "off"], default="off")
 
     night_parser = subparsers.add_parser("night", help="Generate a night mode code")
     night_parser.add_argument("state", choices=["on", "off"])
@@ -108,15 +114,15 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "heat":
-        print(build_heat_code(args.temperature, args.fan_level))
+        print(build_heat_code(args.temperature, args.fan_level, night_mode=args.night == "on"))
         return
 
     if args.command == "cool":
-        print(build_cool_code(args.temperature, args.fan_level))
+        print(build_cool_code(args.temperature, args.fan_level, night_mode=args.night == "on"))
         return
 
     if args.command == "fan":
-        print(build_fan_code(args.level))
+        print(build_fan_code(args.level, night_mode=args.night == "on"))
         return
 
     if args.command == "night":
