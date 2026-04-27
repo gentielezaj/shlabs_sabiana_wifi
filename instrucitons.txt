@@ -1,0 +1,67 @@
+Integration Technical Specification: Sabiana Cloud WM
+Domain: climate
+
+Architecture: DataUpdateCoordinator (Polling-based API)
+
+Auth Strategy: OAuth2-like / JWT Rotation
+
+1. Authentication Logic
+Primary Auth: POST /users/newLogin (Email/Password) returns token and renewToken.
+
+Session Refresh: POST /renewJwt using renewAuth header. Returns newToken (JWT).
+
+Persistence: Store the renewToken in HA config_entry. Logic must intercept 401 Unauthorized to trigger refresh before retrying commands.
+
+2. Data Polling (The Coordinator)
+Endpoint: GET /users/checkUserAuth
+
+Headers: auth: <JWT>, X-Requested-With: it.sabiana.cloud.wm
+
+Frequency: 30 seconds.
+
+Parsing: Iterate through body.devices[].
+
+Current Temp: Byte 11 of lastData string (Hex → Dec / 10).
+
+Target Temp: Byte 13 of lastData string (Hex → Dec / 10).
+
+HVAC Mode: Byte 5 of lastData (00=Cool, 01=Heat, 03=Fan).
+
+Action State: Byte 7 of lastData (21=Running, 60/63=Idle).
+
+3. Climate Entity Mapping
+hvac_modes: cool, heat, fan_only, off.
+
+target_temperature_step: 0.5.
+
+fan_modes: Level 1 to Level 10 (Mapped to Byte 4 using formula: (Level+1)×10→Hex).
+
+Attributes: rssi (from deviceWiFiRSSI), firmware (from deviceStateFw).
+
+4. Service Calls (Write Logic)
+Endpoint: POST /devices/cmds
+
+Payload Structure:
+
+JSON
+{
+  "deviceIDs": ["<idDevice>"],
+  "start": 2304,
+  "data": "<10_BYTE_HEX_STRING>",
+  "restart": false
+}
+Hex Generation:
+
+Off: 14040000FF00FFFF0000
+
+Night Mode: Toggle Byte 9 to 02.
+
+Mode Update: Set Byte 0 to 14, Byte 1 to Mode code, Byte 3 to (Temp×10) in Hex.
+
+Suggested Generation Command
+If you are using a tool like Scaffold, run:
+python3 -m script.scaffold climate
+
+When it asks for "Logic Summary", paste this:
+
+"Integration for Sabiana Cloud WM fan coils. Uses a REST API with JWT header authentication. Maps hex-encoded status strings (byte-shifting) to climate entity states and sends bulk hex commands via POST to /devices/cmds."
