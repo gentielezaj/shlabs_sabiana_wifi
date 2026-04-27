@@ -47,22 +47,15 @@ MODE_TO_HVAC = {
 
 HVAC_TO_MODE = {value: key for key, value in MODE_TO_HVAC.items()}
 
-TEMPERATURE_COMMANDS = {
-    MODE_HEAT: {
-        key: f"1401{value:04X}FF00FFFF0000" for key, value in ((step, step * 5) for step in range(20, 61))
-    },
-    MODE_COOL: {
-        key: f"1400{value:04X}FF00FFFF0000" for key, value in ((step, step * 5) for step in range(20, 61))
-    },
-}
-
-FAN_COMMANDS = {
-    step: f"{(step * 5 + 10):02X}030000FF00FFFF0000" for step in range(2, 21)
-}
+COMMAND_SUFFIX = "FF00FFFF0000"
+FAN_SUFFIX = "030000FF00FFFF0000"
+FAN_AUTO_PREFIX = "04"
 
 
-def _format_fan_mode(level: float) -> str:
+def _format_fan_mode(level: float | str) -> str:
     """Format a fan level with 0.5 precision."""
+    if level == "auto":
+        return "auto"
     return f"{level:.1f}"
 
 
@@ -85,7 +78,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
     _attr_target_temperature_step = TARGET_TEMPERATURE_STEP
     _attr_hvac_modes = [HVACMode.COOL, HVACMode.HEAT, HVACMode.FAN_ONLY, HVACMode.OFF]
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
-    _attr_fan_modes = [_format_fan_mode(level / 2) for level in range(2, 21)]
+    _attr_fan_modes = ["auto", *(_format_fan_mode(level / 2) for level in range(2, 21))]
 
     @property
     def unique_id(self) -> str:
@@ -146,6 +139,9 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         if fan_byte is None:
             return None
 
+        if fan_byte == FAN_AUTO_PREFIX:
+            return "auto"
+
         try:
             level = int(fan_byte, 16) / 10 - 1
         except ValueError:
@@ -193,7 +189,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         elif hvac_mode == HVACMode.FAN_ONLY:
             await self.coordinator.client.async_send_command(
                 self._device_id,
-                _build_fan_command(float(self.fan_mode or "1")),
+                _build_fan_command(self.fan_mode or "auto"),
             )
         else:
             await self.coordinator.client.async_send_command(
@@ -201,6 +197,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
                 _build_temperature_command(
                     mode=HVAC_TO_MODE[hvac_mode],
                     target_temperature=self.target_temperature or 20.0,
+                    fan_mode=self.fan_mode or "auto",
                 ),
             )
         await self.coordinator.async_request_refresh()
@@ -214,6 +211,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
             _build_temperature_command(
                 mode=HVAC_TO_MODE[current_mode],
                 target_temperature=temperature,
+                fan_mode=self.fan_mode or "auto",
             ),
         )
         await self.coordinator.async_request_refresh()
@@ -222,29 +220,46 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         """Set a new fan level."""
         await self.coordinator.client.async_send_command(
             self._device_id,
-            _build_fan_command(float(fan_mode)),
+            _build_fan_command(fan_mode),
         )
         await self.coordinator.async_request_refresh()
 
 
-def _build_temperature_command(*, mode: str, target_temperature: float) -> str:
-    """Build a heat or cool command using the documented codes."""
-    normalized_temperature = _normalize_step_value(target_temperature)
-    try:
-        return TEMPERATURE_COMMANDS[mode][normalized_temperature]
-    except KeyError as err:
-        raise ValueError(f"Unsupported mode/temperature combination: {mode} {target_temperature}") from err
+def _build_temperature_command(*, mode: str, target_temperature: float, fan_mode: str | float) -> str:
+    """Build a heat or cool command using calculated protocol values."""
+    if mode not in (MODE_COOL, MODE_HEAT):
+        raise ValueError(f"Unsupported mode for temperature command: {mode}")
+
+    return f"{_encode_fan_prefix(fan_mode)}{mode}{_encode_temperature(target_temperature)}{COMMAND_SUFFIX}"
 
 
-def _build_fan_command(level: float) -> str:
-    """Build a fan command using the documented codes."""
-    normalized_level = _normalize_step_value(level)
-    try:
-        return FAN_COMMANDS[normalized_level]
-    except KeyError as err:
-        raise ValueError(f"Unsupported fan level: {level}") from err
+def _build_fan_command(level: str | float) -> str:
+    """Build a fan command using calculated protocol values."""
+    return f"{_encode_fan_prefix(level)}{FAN_SUFFIX}"
 
 
-def _normalize_step_value(value: float) -> int:
-    """Normalize a .5-step value into an integer lookup key."""
-    return int(round(value * 2))
+def _encode_temperature(temperature: float) -> str:
+    """Encode a temperature to the command payload format."""
+    normalized_temperature = _validate_half_step(temperature, minimum=MIN_TEMP, maximum=MAX_TEMP, label="Temperature")
+    return f"{int(round(normalized_temperature * 10)):04X}"
+
+
+def _encode_fan_prefix(level: str | float) -> str:
+    """Encode a fan speed or auto mode to the leading command byte."""
+    if isinstance(level, str) and level.lower() == "auto":
+        return FAN_AUTO_PREFIX
+
+    normalized_level = _validate_half_step(float(level), minimum=1.0, maximum=10.0, label="Fan level")
+    return f"{int(round(normalized_level * 10 + 10)):02X}"
+
+
+def _validate_half_step(value: float, *, minimum: float, maximum: float, label: str) -> float:
+    """Validate that a value stays within range and .5 increments."""
+    if not minimum <= value <= maximum:
+        raise ValueError(f"{label} must be between {minimum} and {maximum}")
+
+    doubled = value * 2
+    if int(round(doubled)) != doubled:
+        raise ValueError(f"{label} must use {TARGET_TEMPERATURE_STEP} increments")
+
+    return value
