@@ -10,16 +10,16 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import SabianaDataUpdateCoordinator
 
-LAST_DATA_POWER_BYTE = 7
-LAST_DATA_MODE_BYTE = 7
+LAST_DATA_POWER_BYTE = 5
+LAST_DATA_MODE_BYTE = 6
 LAST_DATA_ACTION_BYTE = 8
 LAST_DATA_CURRENT_TEMP_BYTE = 12
 LAST_DATA_TARGET_TEMP_BYTE = 14
 LAST_DATA_SECONDARY_TARGET_TEMP_BYTE = 16
 LAST_DATA_WATER_TEMP_BYTE = 18
 LAST_DATA_LIMIT_TEMP_BYTE = 19
-LAST_DATA_FAN_STATUS_BYTE = 23
-LAST_DATA_NIGHT_MODE_BYTE = 10
+LAST_DATA_FAN_STATUS_BYTE = 24
+LAST_DATA_NIGHT_MODE_BYTE = 36
 
 
 class SabianaCoordinatorEntity(CoordinatorEntity[SabianaDataUpdateCoordinator]):
