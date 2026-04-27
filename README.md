@@ -1,5 +1,8 @@
 # Sabiana Wifi Integration
 
+THIS IS GENERATED WITH AI, I DO NOT KNOW PYTHON...
+
+
 This repository contains a custom Home Assistant integration for Sabiana fan coils.
 
 It authenticates against Sabiana's cloud API, polls device state every 30 seconds, parses the `lastData` hex payload, and exposes each unit as a Home Assistant `climate` entity.
