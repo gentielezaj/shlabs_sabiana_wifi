@@ -23,7 +23,21 @@ from .const import (
     OFF_COMMAND,
     TARGET_TEMPERATURE_STEP,
 )
-from .entity import SabianaCoordinatorEntity
+from .entity import (
+    LAST_DATA_ACTION_BYTE,
+    LAST_DATA_CURRENT_TEMP_BYTE,
+    LAST_DATA_FAN_BYTE,
+    LAST_DATA_MODE_BYTE,
+    LAST_DATA_NIGHT_MODE_BYTE,
+    LAST_DATA_POWER_BYTE,
+    LAST_DATA_LIMIT_TEMP_BYTE,
+    LAST_DATA_SECONDARY_TARGET_TEMP_BYTE,
+    LAST_DATA_TARGET_TEMP_BYTE,
+    LAST_DATA_WATER_TEMP_BYTE,
+    SabianaCoordinatorEntity,
+    byte_at,
+    parse_temperature,
+)
 
 MODE_TO_HVAC = {
     MODE_COOL: HVACMode.COOL,
@@ -81,12 +95,12 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
     @property
     def current_temperature(self) -> float | None:
         """Return current temperature."""
-        return _parse_temperature(self._device_payload.get("lastData"), 12)
+        return parse_temperature(self._last_data, LAST_DATA_CURRENT_TEMP_BYTE)
 
     @property
     def target_temperature(self) -> float | None:
         """Return target temperature."""
-        return _parse_temperature(self._device_payload.get("lastData"), 14)
+        return parse_temperature(self._last_data, LAST_DATA_TARGET_TEMP_BYTE)
 
     @property
     def hvac_mode(self) -> HVACMode:
@@ -95,9 +109,11 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         if not last_data:
             return HVACMode.OFF
 
-        mode_byte = _byte_at(last_data, 7)
-        if mode_byte == MODE_OFF:
+        power_byte = byte_at(last_data, LAST_DATA_POWER_BYTE)
+        if power_byte == MODE_OFF:
             return HVACMode.OFF
+
+        mode_byte = byte_at(last_data, LAST_DATA_MODE_BYTE)
 
         return MODE_TO_HVAC.get(mode_byte, HVACMode.OFF)
 
@@ -107,7 +123,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         if self.hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
 
-        action_code = _byte_at(self._last_data, 8)
+        action_code = byte_at(self._last_data, LAST_DATA_ACTION_BYTE)
         if action_code == ACTION_RUNNING:
             if self.hvac_mode == HVACMode.COOL:
                 return HVACAction.COOLING
@@ -121,7 +137,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
     @property
     def fan_mode(self) -> str | None:
         """Return current fan mode."""
-        fan_byte = _byte_at(self._last_data, 1)
+        fan_byte = byte_at(self._last_data, LAST_DATA_FAN_BYTE)
         if fan_byte is None:
             return None
 
@@ -137,7 +153,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
     @property
     def is_aux_heat(self) -> bool:
         """Expose night mode from the last command byte."""
-        return _byte_at(self._last_data, 10) == "02"
+        return byte_at(self._last_data, LAST_DATA_NIGHT_MODE_BYTE) == "02"
 
     @property
     def extra_state_attributes(self) -> dict[str, str | None]:
@@ -145,6 +161,13 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         return {
             ATTR_RSSI: self._device_payload.get("deviceWiFiRSSI"),
             ATTR_FIRMWARE: self._device_payload.get("deviceStateFw"),
+            "power_byte": byte_at(self._last_data, LAST_DATA_POWER_BYTE),
+            "mode_byte": byte_at(self._last_data, LAST_DATA_MODE_BYTE),
+            "action_byte": byte_at(self._last_data, LAST_DATA_ACTION_BYTE),
+            "secondary_target_temperature": parse_temperature(self._last_data, LAST_DATA_SECONDARY_TARGET_TEMP_BYTE),
+            "water_temperature": parse_temperature(self._last_data, LAST_DATA_WATER_TEMP_BYTE),
+            "limit_temperature": parse_temperature(self._last_data, LAST_DATA_LIMIT_TEMP_BYTE),
+            "night_mode": byte_at(self._last_data, LAST_DATA_NIGHT_MODE_BYTE) == "02",
         }
 
     @property
@@ -196,40 +219,6 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
             _build_fan_command(float(fan_mode)),
         )
         await self.coordinator.async_request_refresh()
-
-    @property
-    def _device_payload(self) -> dict:
-        """Return raw payload for this entity."""
-        return self.coordinator.data.devices[self._device_id].payload
-
-    @property
-    def _last_data(self) -> str:
-        """Return normalized status data."""
-        return str(self._device_payload.get("lastData") or "").upper()
-
-
-def _parse_temperature(last_data: str | None, byte_index: int) -> float | None:
-    """Parse a temperature from the payload string."""
-    value = _byte_at(last_data, byte_index)
-    if value is None:
-        return None
-
-    try:
-        return int(value, 16) / 10
-    except ValueError:
-        return None
-
-
-def _byte_at(payload: str | None, byte_index: int) -> str | None:
-    """Return a 1-based byte from a hex string."""
-    if not payload:
-        return None
-    start = (byte_index - 1) * 2
-    end = start + 2
-    if len(payload) < end:
-        return None
-    return payload[start:end]
-
 
 def _format_fan_mode(level: float) -> str:
     """Format a fan level without trailing .0."""

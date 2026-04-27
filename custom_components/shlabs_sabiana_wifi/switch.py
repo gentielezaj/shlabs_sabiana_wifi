@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import NIGHT_MODE_OFF_COMMAND, NIGHT_MODE_ON_COMMAND
-from .entity import SabianaCoordinatorEntity
+from .entity import LAST_DATA_NIGHT_MODE_BYTE, SabianaCoordinatorEntity, byte_at
 
 
 async def async_setup_entry(
@@ -40,7 +40,7 @@ class SabianaNightModeSwitch(SabianaCoordinatorEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return whether night mode is enabled."""
-        return _byte_at(self._last_data, 10) == "02"
+        return byte_at(self._last_data, LAST_DATA_NIGHT_MODE_BYTE) == "02"
 
     async def async_turn_on(self, **kwargs) -> None:
         """Enable night mode."""
@@ -51,24 +51,3 @@ class SabianaNightModeSwitch(SabianaCoordinatorEntity, SwitchEntity):
         """Disable night mode."""
         await self.coordinator.client.async_send_command(self._device_id, NIGHT_MODE_OFF_COMMAND)
         await self.coordinator.async_request_refresh()
-
-    @property
-    def _device_payload(self) -> dict:
-        """Return raw payload for this entity."""
-        return self.coordinator.data.devices[self._device_id].payload
-
-    @property
-    def _last_data(self) -> str:
-        """Return normalized status data."""
-        return str(self._device_payload.get("lastData") or "").upper()
-
-
-def _byte_at(payload: str | None, byte_index: int) -> str | None:
-    """Return a 1-based byte from a hex string."""
-    if not payload:
-        return None
-    start = (byte_index - 1) * 2
-    end = start + 2
-    if len(payload) < end:
-        return None
-    return payload[start:end]
