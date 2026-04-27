@@ -1,7 +1,7 @@
 {
   "domain": "shlabs_sabiana_wifi",
   "name": "Sabiana Wifi Integration",
-  "codeowners": [],
+  "codeowners": ["@gentielezaj"],
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/climate",
   "integration_type": "device",
