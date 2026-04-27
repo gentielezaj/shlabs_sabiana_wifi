@@ -1,5 +1,7 @@
 # SHLabs Sabiana WiFi
 
+I do not know python so I used AI for this
+
 Custom Home Assistant integration for Sabiana fan coils that use the Sabiana cloud API.
 
 The integration authenticates against the Sabiana service, polls device state every 30 seconds, parses the `lastData` payload, and exposes each unit as a Home Assistant `climate` entity.
