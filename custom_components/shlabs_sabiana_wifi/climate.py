@@ -61,6 +61,13 @@ FAN_COMMANDS = {
 }
 
 
+def _format_fan_mode(level: float) -> str:
+    """Format a fan level without trailing .0."""
+    if level.is_integer():
+        return str(int(level))
+    return str(level)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -219,12 +226,6 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
             _build_fan_command(float(fan_mode)),
         )
         await self.coordinator.async_request_refresh()
-
-def _format_fan_mode(level: float) -> str:
-    """Format a fan level without trailing .0."""
-    if level.is_integer():
-        return str(int(level))
-    return str(level)
 
 
 def _build_temperature_command(*, mode: str, target_temperature: float) -> str:
