@@ -1,7 +1,7 @@
 """Constants for the SHLabs Sabiana Wifi integration."""
 
 DOMAIN = "shlabs_sabiana_wifi"
-PLATFORMS = ["climate"]
+PLATFORMS = ["climate", "switch"]
 
 CONF_BASE_URL = "base_url"
 
@@ -29,6 +29,8 @@ ACTION_RUNNING = "21"
 ACTION_IDLE_VALUES = {"60", "63"}
 
 OFF_COMMAND = "04040000FF00FFFF0000"
+NIGHT_MODE_ON_COMMAND = "14030000FF00FFFF0002"
+NIGHT_MODE_OFF_COMMAND = "14030000FF00FFFF0000"
 
 MIN_TEMP = 10.0
 MAX_TEMP = 30.0

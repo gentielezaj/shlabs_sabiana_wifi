@@ -33,6 +33,19 @@ MODE_TO_HVAC = {
 
 HVAC_TO_MODE = {value: key for key, value in MODE_TO_HVAC.items()}
 
+TEMPERATURE_COMMANDS = {
+    MODE_HEAT: {
+        key: f"1401{value:04X}FF00FFFF0000" for key, value in ((step, step * 5) for step in range(20, 61))
+    },
+    MODE_COOL: {
+        key: f"1400{value:04X}FF00FFFF0000" for key, value in ((step, step * 5) for step in range(20, 61))
+    },
+}
+
+FAN_COMMANDS = {
+    step: f"{(step * 5 + 10):02X}030000FF00FFFF0000" for step in range(2, 21)
+}
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -53,7 +66,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
     _attr_target_temperature_step = TARGET_TEMPERATURE_STEP
     _attr_hvac_modes = [HVACMode.COOL, HVACMode.HEAT, HVACMode.FAN_ONLY, HVACMode.OFF]
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
-    _attr_fan_modes = [str(level) for level in range(1, 11)]
+    _attr_fan_modes = [_format_fan_mode(level / 2) for level in range(2, 21)]
 
     @property
     def unique_id(self) -> str:
@@ -113,13 +126,18 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
             return None
 
         try:
-            level = int(int(fan_byte, 16) / 10) - 1
+            level = int(fan_byte, 16) / 10 - 1
         except ValueError:
             return None
 
         if 1 <= level <= 10:
-            return str(level)
+            return _format_fan_mode(level)
         return None
+
+    @property
+    def is_aux_heat(self) -> bool:
+        """Expose night mode from the last command byte."""
+        return _byte_at(self._last_data, 10) == "02"
 
     @property
     def extra_state_attributes(self) -> dict[str, str | None]:
@@ -143,14 +161,17 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         """Set the HVAC mode."""
         if hvac_mode == HVACMode.OFF:
             await self.coordinator.client.async_send_command(self._device_id, OFF_COMMAND)
+        elif hvac_mode == HVACMode.FAN_ONLY:
+            await self.coordinator.client.async_send_command(
+                self._device_id,
+                _build_fan_command(float(self.fan_mode or "1")),
+            )
         else:
             await self.coordinator.client.async_send_command(
                 self._device_id,
-                _build_command(
+                _build_temperature_command(
                     mode=HVAC_TO_MODE[hvac_mode],
                     target_temperature=self.target_temperature or 20.0,
-                    fan_level=int(self.fan_mode or "1"),
-                    night_mode=_byte_at(self._last_data, 9) == "02",
                 ),
             )
         await self.coordinator.async_request_refresh()
@@ -158,29 +179,21 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs) -> None:
         """Set a new target temperature."""
         temperature = kwargs[ATTR_TEMPERATURE]
-        current_mode = self.hvac_mode if self.hvac_mode != HVACMode.OFF else HVACMode.COOL
+        current_mode = self.hvac_mode if self.hvac_mode in (HVACMode.COOL, HVACMode.HEAT) else HVACMode.COOL
         await self.coordinator.client.async_send_command(
             self._device_id,
-            _build_command(
+            _build_temperature_command(
                 mode=HVAC_TO_MODE[current_mode],
                 target_temperature=temperature,
-                fan_level=int(self.fan_mode or "1"),
-                night_mode=_byte_at(self._last_data, 9) == "02",
             ),
         )
         await self.coordinator.async_request_refresh()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set a new fan level."""
-        current_mode = self.hvac_mode if self.hvac_mode != HVACMode.OFF else HVACMode.FAN_ONLY
         await self.coordinator.client.async_send_command(
             self._device_id,
-            _build_command(
-                mode=HVAC_TO_MODE[current_mode],
-                target_temperature=self.target_temperature or 20.0,
-                fan_level=int(float(fan_mode)),
-                night_mode=_byte_at(self._last_data, 9) == "02",
-            ),
+            _build_fan_command(float(fan_mode)),
         )
         await self.coordinator.async_request_refresh()
 
@@ -218,20 +231,31 @@ def _byte_at(payload: str | None, byte_index: int) -> str | None:
     return payload[start:end]
 
 
-def _encode_temperature(value: float) -> str:
-    """Encode a target temperature into the command payload."""
-    encoded = int(round(value * 10))
-    return f"{encoded:04X}"
+def _format_fan_mode(level: float) -> str:
+    """Format a fan level without trailing .0."""
+    if level.is_integer():
+        return str(int(level))
+    return str(level)
 
 
-def _encode_fan_level(level: int) -> str:
-    """Encode a fan level using the documented formula."""
-    encoded = int((level + 1) * 10)
-    return f"{encoded:02X}"
+def _build_temperature_command(*, mode: str, target_temperature: float) -> str:
+    """Build a heat or cool command using the documented codes."""
+    normalized_temperature = _normalize_step_value(target_temperature)
+    try:
+        return TEMPERATURE_COMMANDS[mode][normalized_temperature]
+    except KeyError as err:
+        raise ValueError(f"Unsupported mode/temperature combination: {mode} {target_temperature}") from err
 
 
-def _build_command(*, mode: str, target_temperature: float, fan_level: int, night_mode: bool) -> str:
-    """Build the 10-byte hex command string."""
-    temp_hex = _encode_temperature(target_temperature)
-    night_hex = "02" if night_mode else "00"
-    return f"{_encode_fan_level(fan_level)}{mode}{temp_hex}FF00FFFF00{night_hex}"
+def _build_fan_command(level: float) -> str:
+    """Build a fan command using the documented codes."""
+    normalized_level = _normalize_step_value(level)
+    try:
+        return FAN_COMMANDS[normalized_level]
+    except KeyError as err:
+        raise ValueError(f"Unsupported fan level: {level}") from err
+
+
+def _normalize_step_value(value: float) -> int:
+    """Normalize a .5-step value into an integer lookup key."""
+    return int(round(value * 2))
