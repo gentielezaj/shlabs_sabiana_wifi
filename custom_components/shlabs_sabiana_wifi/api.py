@@ -12,7 +12,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from lastdate_decoder import SabianaCloudWM
+from .lastdate_decoder import SabianaCloudWM
 from .const import API_COMMANDS, API_DEVICES, API_LOGIN, API_RENEW, APP_ID_HEADER, CONF_BASE_URL
 
 
