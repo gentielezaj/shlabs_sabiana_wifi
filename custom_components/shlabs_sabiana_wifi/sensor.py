@@ -25,7 +25,6 @@ from .entity import (
     LAST_DATA_TARGET_TEMP_BYTE,
     LAST_DATA_WATER_TEMP_BYTE,
     SabianaCoordinatorEntity,
-    byte_at,
     parse_temperature,
 )
 
@@ -72,17 +71,17 @@ STATUS_SENSORS: tuple[SabianaDiagnosticDescription, ...] = (
 
 DIAGNOSTIC_SENSORS: tuple[SabianaDiagnosticDescription, ...] = (
     SabianaDiagnosticDescription("last_data", "Last data", lambda payload: payload or None),
-    SabianaDiagnosticDescription("power_byte", "Power byte", lambda payload: byte_at(payload, LAST_DATA_POWER_BYTE)),
-    SabianaDiagnosticDescription("mode_byte", "Mode byte", lambda payload: byte_at(payload, LAST_DATA_MODE_BYTE)),
-    SabianaDiagnosticDescription("action_byte", "Action byte", lambda payload: byte_at(payload, LAST_DATA_ACTION_BYTE)),
-    SabianaDiagnosticDescription("fan_status_byte", "Fan status byte", lambda payload: byte_at(payload, LAST_DATA_FAN_STATUS_BYTE)),
+    SabianaDiagnosticDescription("power_byte", "Power byte", lambda payload: payload.get(LAST_DATA_POWER_BYTE) if payload else None),
+    SabianaDiagnosticDescription("mode_byte", "Mode byte", lambda payload: payload.get(LAST_DATA_MODE_BYTE) if payload else None),
+    SabianaDiagnosticDescription("action_byte", "Action byte", lambda payload: payload.get(LAST_DATA_ACTION_BYTE) if payload else None),
+    SabianaDiagnosticDescription("fan_status_byte", "Fan status byte", lambda payload: payload.get(LAST_DATA_FAN_STATUS_BYTE) if payload else None),
     SabianaDiagnosticDescription("fan_level", "Fan level", lambda payload: _parse_fan_level(payload)),
     SabianaDiagnosticDescription("current_temperature", "Current temperature", lambda payload: parse_temperature(payload, LAST_DATA_CURRENT_TEMP_BYTE)),
     SabianaDiagnosticDescription("target_temperature", "Target temperature", lambda payload: parse_temperature(payload, LAST_DATA_TARGET_TEMP_BYTE)),
     SabianaDiagnosticDescription("secondary_target_temperature", "Secondary target temperature", lambda payload: parse_temperature(payload, LAST_DATA_SECONDARY_TARGET_TEMP_BYTE)),
     SabianaDiagnosticDescription("water_temperature", "Water temperature", lambda payload: parse_temperature(payload, LAST_DATA_WATER_TEMP_BYTE)),
     SabianaDiagnosticDescription("limit_temperature", "Limit temperature", lambda payload: parse_temperature(payload, LAST_DATA_LIMIT_TEMP_BYTE)),
-    SabianaDiagnosticDescription("night_mode", "Night mode", lambda payload: "on" if byte_at(payload, LAST_DATA_NIGHT_MODE_BYTE) == "02" else "off"),
+    SabianaDiagnosticDescription("night_mode", "Night mode", lambda payload: "on" if payload and payload.get(LAST_DATA_NIGHT_MODE_BYTE) else "off"),
 )
 
 
@@ -135,13 +134,16 @@ class SabianaDiagnosticSensor(SabianaCoordinatorEntity, SensorEntity):
         return {"last_data": self._last_data}
 
 
-def _parse_fan_level(payload: str | None) -> float | None:
-    """Decode fan level from the documented status byte."""
-    value = byte_at(payload, LAST_DATA_FAN_STATUS_BYTE)
+def _parse_fan_level(payload: dict | None) -> float | None:
+    """Decode fan level from the parsed lastData dict."""
+    if not payload:
+        return None
+    value = payload.get(LAST_DATA_FAN_STATUS_BYTE)
     if value is None:
         return None
-
+    if value == "AUTO":
+        return None
     try:
-        return (int(value, 16) - 10) / 10
-    except ValueError:
+        return float(value)
+    except (TypeError, ValueError):
         return None

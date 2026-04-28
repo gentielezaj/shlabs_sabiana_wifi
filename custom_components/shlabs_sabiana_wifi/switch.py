@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import NIGHT_MODE_OFF_COMMAND, NIGHT_MODE_ON_COMMAND
-from .entity import LAST_DATA_NIGHT_MODE_BYTE, SabianaCoordinatorEntity, byte_at
+from .entity import LAST_DATA_NIGHT_MODE_BYTE, SabianaCoordinatorEntity
 
 
 async def async_setup_entry(
@@ -40,7 +40,7 @@ class SabianaNightModeSwitch(SabianaCoordinatorEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return whether night mode is enabled."""
-        return byte_at(self._last_data, LAST_DATA_NIGHT_MODE_BYTE) == "02"
+        return bool(self._last_data.get(LAST_DATA_NIGHT_MODE_BYTE)) if self._last_data else False
 
     async def async_turn_on(self, **kwargs) -> None:
         """Enable night mode."""

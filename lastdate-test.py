@@ -1,6 +1,6 @@
 import sys
 import json
-from lastdate_decoder import SabianaCloudWM
+from custom_components.shlabs_sabiana_wifi.lastdate_decoder import SabianaCloudWM
 
 def run_test():
     # 1. Check for command line argument

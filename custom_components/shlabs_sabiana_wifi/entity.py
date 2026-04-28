@@ -10,16 +10,30 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import SabianaDataUpdateCoordinator
 
-LAST_DATA_POWER_BYTE = 5
-LAST_DATA_MODE_BYTE = 6
-LAST_DATA_ACTION_BYTE = 8
-LAST_DATA_CURRENT_TEMP_BYTE = 12
-LAST_DATA_TARGET_TEMP_BYTE = 14
-LAST_DATA_SECONDARY_TARGET_TEMP_BYTE = 16
-LAST_DATA_WATER_TEMP_BYTE = 18
-LAST_DATA_LIMIT_TEMP_BYTE = 19
-LAST_DATA_FAN_STATUS_BYTE = 24
-LAST_DATA_NIGHT_MODE_BYTE = 36
+# Keys into the parsed lastData dict (from SabianaCloudWM.parse)
+LAST_DATA_POWER_BYTE = "is_on"
+LAST_DATA_MODE_BYTE = "mode"
+LAST_DATA_ACTION_BYTE = "power_status"
+LAST_DATA_FAN_STATUS_BYTE = "fan_setpoint"
+LAST_DATA_NIGHT_MODE_BYTE = "night_mode"
+LAST_DATA_CURRENT_TEMP_BYTE = "room_temp"
+LAST_DATA_TARGET_TEMP_BYTE = "target_temp"
+LAST_DATA_SECONDARY_TARGET_TEMP_BYTE = "target_temp"
+LAST_DATA_WATER_TEMP_BYTE = "water_temp"
+LAST_DATA_LIMIT_TEMP_BYTE = "water_temp"
+
+
+def parse_temperature(data: dict[str, Any] | None, key: str) -> float | None:
+    """Return a temperature value from the parsed lastData dict."""
+    if not data:
+        return None
+    value = data.get(key)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 class SabianaCoordinatorEntity(CoordinatorEntity[SabianaDataUpdateCoordinator]):
@@ -48,29 +62,7 @@ class SabianaCoordinatorEntity(CoordinatorEntity[SabianaDataUpdateCoordinator]):
         return self.coordinator.data.devices[self._device_id].payload
 
     @property
-    def _last_data(self) -> str:
+    def _last_data(self) -> dict[str, Any]:
         """Return normalized status data."""
-        return str(self._device_payload.get("lastData") or "").upper()
+        return self.coordinator.data.devices[self._device_id].lastData
 
-
-def byte_at(payload: str | None, byte_index: int) -> str | None:
-    """Return a 1-based byte from a hex string."""
-    if not payload:
-        return None
-    start = (byte_index - 1) * 2
-    end = start + 2
-    if len(payload) < end:
-        return None
-    return payload[start:end]
-
-
-def parse_temperature(payload: str | None, byte_index: int) -> float | None:
-    """Parse a temperature byte into Celsius."""
-    value = byte_at(payload, byte_index)
-    if value is None:
-        return None
-
-    try:
-        return int(value, 16) / 10
-    except ValueError:
-        return None

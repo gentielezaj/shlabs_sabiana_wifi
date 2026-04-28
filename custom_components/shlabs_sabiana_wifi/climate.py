@@ -19,7 +19,6 @@ from .const import (
     MODE_COOL,
     MODE_FAN,
     MODE_HEAT,
-    MODE_OFF,
     OFF_COMMAND,
     TARGET_TEMPERATURE_STEP,
 )
@@ -35,17 +34,20 @@ from .entity import (
     LAST_DATA_TARGET_TEMP_BYTE,
     LAST_DATA_WATER_TEMP_BYTE,
     SabianaCoordinatorEntity,
-    byte_at,
     parse_temperature,
 )
 
 MODE_TO_HVAC = {
-    MODE_COOL: HVACMode.COOL,
-    MODE_HEAT: HVACMode.HEAT,
-    MODE_FAN: HVACMode.FAN_ONLY,
+    "Cooling": HVACMode.COOL,
+    "Heating": HVACMode.HEAT,
+    "Fan Only": HVACMode.FAN_ONLY,
 }
 
-HVAC_TO_MODE = {value: key for key, value in MODE_TO_HVAC.items()}
+HVAC_TO_MODE = {
+    HVACMode.COOL: MODE_COOL,
+    HVACMode.HEAT: MODE_HEAT,
+    HVACMode.FAN_ONLY: MODE_FAN,
+}
 
 COMMAND_SUFFIX = "FF00FFFF00"
 FAN_SUFFIX = "030000FF00FFFF00"
@@ -107,13 +109,12 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         if not last_data:
             return HVACMode.OFF
 
-        power_byte = byte_at(last_data, LAST_DATA_POWER_BYTE)
-        if power_byte == MODE_OFF:
+        if not last_data.get(LAST_DATA_POWER_BYTE):
             return HVACMode.OFF
 
-        mode_byte = byte_at(last_data, LAST_DATA_MODE_BYTE)
+        mode_value = last_data.get(LAST_DATA_MODE_BYTE)
 
-        return MODE_TO_HVAC.get(mode_byte, HVACMode.OFF)
+        return MODE_TO_HVAC.get(mode_value, HVACMode.OFF)
 
     @property
     def hvac_action(self) -> HVACAction | None:
@@ -121,7 +122,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         if self.hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
 
-        action_code = byte_at(self._last_data, LAST_DATA_ACTION_BYTE)
+        action_code = self._last_data.get(LAST_DATA_ACTION_BYTE) if self._last_data else None
         if action_code == ACTION_RUNNING:
             if self.hvac_mode == HVACMode.COOL:
                 return HVACAction.COOLING
@@ -135,16 +136,16 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
     @property
     def fan_mode(self) -> str | None:
         """Return current fan mode."""
-        fan_byte = byte_at(self._last_data, LAST_DATA_FAN_STATUS_BYTE)
-        if fan_byte is None:
+        fan_value = self._last_data.get(LAST_DATA_FAN_STATUS_BYTE) if self._last_data else None
+        if fan_value is None:
             return None
 
-        if fan_byte == FAN_AUTO_PREFIX:
+        if fan_value == "AUTO":
             return "auto"
 
         try:
-            level = int(fan_byte, 16) / 10 - 1
-        except ValueError:
+            level = float(fan_value)
+        except (TypeError, ValueError):
             return None
 
         if 1 <= level <= 10:
@@ -154,7 +155,7 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
     @property
     def is_aux_heat(self) -> bool:
         """Expose night mode from the last command byte."""
-        return byte_at(self._last_data, LAST_DATA_NIGHT_MODE_BYTE) == "02"
+        return bool(self._last_data.get(LAST_DATA_NIGHT_MODE_BYTE)) if self._last_data else False
 
     @property
     def extra_state_attributes(self) -> dict[str, str | None]:
@@ -162,14 +163,14 @@ class SabianaClimateEntity(SabianaCoordinatorEntity, ClimateEntity):
         return {
             ATTR_RSSI: self._device_payload.get("deviceWiFiRSSI"),
             ATTR_FIRMWARE: self._device_payload.get("deviceStateFw"),
-            "power_byte": byte_at(self._last_data, LAST_DATA_POWER_BYTE),
-            "mode_byte": byte_at(self._last_data, LAST_DATA_MODE_BYTE),
-            "action_byte": byte_at(self._last_data, LAST_DATA_ACTION_BYTE),
-            "fan_status_byte": byte_at(self._last_data, LAST_DATA_FAN_STATUS_BYTE),
+            "power_byte": self._last_data.get(LAST_DATA_POWER_BYTE) if self._last_data else None,
+            "mode_byte": self._last_data.get(LAST_DATA_MODE_BYTE) if self._last_data else None,
+            "action_byte": self._last_data.get(LAST_DATA_ACTION_BYTE) if self._last_data else None,
+            "fan_status_byte": self._last_data.get(LAST_DATA_FAN_STATUS_BYTE) if self._last_data else None,
             "secondary_target_temperature": parse_temperature(self._last_data, LAST_DATA_SECONDARY_TARGET_TEMP_BYTE),
             "water_temperature": parse_temperature(self._last_data, LAST_DATA_WATER_TEMP_BYTE),
             "limit_temperature": parse_temperature(self._last_data, LAST_DATA_LIMIT_TEMP_BYTE),
-            "night_mode": byte_at(self._last_data, LAST_DATA_NIGHT_MODE_BYTE) == "02",
+            "night_mode": bool(self._last_data.get(LAST_DATA_NIGHT_MODE_BYTE)) if self._last_data else False,
         }
 
     @property

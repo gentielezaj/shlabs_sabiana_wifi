@@ -12,6 +12,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from lastdate_decoder import SabianaCloudWM
 from .const import API_COMMANDS, API_DEVICES, API_LOGIN, API_RENEW, APP_ID_HEADER, CONF_BASE_URL
 
 
@@ -30,6 +31,7 @@ class SabianaDevice:
     id: str
     name: str
     payload: dict[str, Any]
+    lastData: dict[str, Any]
 
 
 class SabianaApiClient:
@@ -89,7 +91,8 @@ class SabianaApiClient:
             if not device_id:
                 continue
             name = str(device.get("deviceName") or device.get("name") or device_id)
-            result.append(SabianaDevice(id=device_id, name=name, payload=device))
+            hex_input = str(device.get("lastData") or "")
+            result.append(SabianaDevice(id=device_id, name=name, payload=device, lastData=SabianaCloudWM.parse(hex_input)))
 
         return result
 
