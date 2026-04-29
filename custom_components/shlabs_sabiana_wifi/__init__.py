@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
@@ -13,13 +14,15 @@ from .coordinator import SabianaDataUpdateCoordinator
 
 SabianaConfigEntry = ConfigEntry[SabianaDataUpdateCoordinator]
 
-_IMAGES_PATH = Path(__file__).parent / "images"
+_STATIC_PATH = Path(__file__).parent / "static"
 _STATIC_URL = f"/{DOMAIN}/static"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Register static assets for the integration."""
-    hass.http.register_static_path(_STATIC_URL, str(_IMAGES_PATH), cache_headers=True)
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(_STATIC_URL, str(_STATIC_PATH), cache_headers=True)]
+    )
     return True
 
 
