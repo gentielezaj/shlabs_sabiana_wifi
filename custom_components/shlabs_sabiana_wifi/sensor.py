@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
@@ -44,14 +44,6 @@ class SabianaDiagnosticDescription:
 
 STATUS_SENSORS: tuple[SabianaDiagnosticDescription, ...] = (
     SabianaDiagnosticDescription(
-        "current_temperature_label",
-        "Current temperature",
-        lambda payload: parse_temperature(payload, LAST_DATA_CURRENT_TEMP_BYTE),
-        diagnostic=False,
-        device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-    ),
-    SabianaDiagnosticDescription(
         "target_temperature_label",
         "Target temperature",
         lambda payload: parse_temperature(payload, LAST_DATA_TARGET_TEMP_BYTE),
@@ -77,7 +69,6 @@ DIAGNOSTIC_SENSORS: tuple[SabianaDiagnosticDescription, ...] = (
     SabianaDiagnosticDescription("action_byte", "Action byte", lambda payload: payload.get(LAST_DATA_ACTION_BYTE) if payload else None),
     SabianaDiagnosticDescription("fan_status_byte", "Fan status byte", lambda payload: payload.get(LAST_DATA_FAN_STATUS_BYTE) if payload else None),
     SabianaDiagnosticDescription("fan_level", "Fan level", lambda payload: _parse_fan_level(payload)),
-    SabianaDiagnosticDescription("current_temperature", "Current temperature", lambda payload: parse_temperature(payload, LAST_DATA_CURRENT_TEMP_BYTE)),
     SabianaDiagnosticDescription("target_temperature", "Target temperature", lambda payload: parse_temperature(payload, LAST_DATA_TARGET_TEMP_BYTE)),
     SabianaDiagnosticDescription("secondary_target_temperature", "Secondary target temperature", lambda payload: parse_temperature(payload, LAST_DATA_SECONDARY_TARGET_TEMP_BYTE)),
     SabianaDiagnosticDescription("water_temperature", "Water temperature", lambda payload: parse_temperature(payload, LAST_DATA_WATER_TEMP_BYTE)),
@@ -126,11 +117,37 @@ async def async_setup_entry(
     """Set up Sabiana diagnostic sensors."""
     coordinator = entry.runtime_data
     entities = [
+        SabianaCurrentTemperatureSensor(coordinator, device_id)
+        for device_id in coordinator.data.devices
+    ]
+    entities.extend(
+        [
         SabianaDiagnosticSensor(coordinator, device_id, description)
         for device_id in coordinator.data.devices
         for description in (*STATUS_SENSORS, *DIAGNOSTIC_SENSORS, *PARSED_RESPONSE_SENSORS)
-    ]
+        ]
+    )
     async_add_entities(entities)
+
+
+class SabianaCurrentTemperatureSensor(SabianaCoordinatorEntity, SensorEntity):
+    """Primary current temperature sensor for a Sabiana device."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Current temperature"
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID."""
+        return f"{self._device_id}_current_temperature"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current room temperature."""
+        return parse_temperature(self._last_data, LAST_DATA_CURRENT_TEMP_BYTE)
 
 
 class SabianaDiagnosticSensor(SabianaCoordinatorEntity, SensorEntity):

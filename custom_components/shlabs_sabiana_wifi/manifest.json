@@ -9,5 +9,5 @@
   "iot_class": "cloud_push",
   "loggers": ["custom_components.shlabs_sabiana_wifi"],
   "requirements": [],
-  "version": "0.2"
+  "version": "0.2.1"
 }
