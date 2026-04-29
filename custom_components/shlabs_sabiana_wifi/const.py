@@ -8,7 +8,7 @@ ENTITY_PICTURE_URL = f"/{DOMAIN}/static/sabiana.webp"
 CONF_BASE_URL = "base_url"
 
 DEFAULT_NAME = "SHLabs Sabiana WiFi"
-DEFAULT_SCAN_INTERVAL = 30
+DEFAULT_SCAN_INTERVAL = 60
 DEFAULT_BASE_URL = "https://be-standard.sabianawm.cloud"
 
 ATTR_RSSI = "rssi"
