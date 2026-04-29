@@ -35,7 +35,7 @@ class SabianaDiagnosticDescription:
 
     key: str
     name: str
-    value_fn: Callable[[str], str | float | None]
+    value_fn: Callable[[dict[str, Any] | None], str | float | bool | None]
     diagnostic: bool = True
     device_class: SensorDeviceClass | None = None
     native_unit_of_measurement: str | None = None
@@ -85,6 +85,38 @@ DIAGNOSTIC_SENSORS: tuple[SabianaDiagnosticDescription, ...] = (
 )
 
 
+PARSED_RESPONSE_SENSORS: tuple[SabianaDiagnosticDescription, ...] = (
+    SabianaDiagnosticDescription("parsed_is_on", "Parsed is_on", lambda payload: "on" if payload and payload.get("is_on") else "off"),
+    SabianaDiagnosticDescription("parsed_power_status", "Parsed power_status", lambda payload: payload.get("power_status") if payload else None),
+    SabianaDiagnosticDescription("parsed_mode", "Parsed mode", lambda payload: payload.get("mode") if payload else None),
+    SabianaDiagnosticDescription("parsed_night_mode", "Parsed night_mode", lambda payload: "on" if payload and payload.get("night_mode") else "off"),
+    SabianaDiagnosticDescription(
+        "parsed_room_temp",
+        "Parsed room_temp",
+        lambda payload: parse_temperature(payload, "room_temp"),
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    ),
+    SabianaDiagnosticDescription(
+        "parsed_target_temp",
+        "Parsed target_temp",
+        lambda payload: parse_temperature(payload, "target_temp"),
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    ),
+    SabianaDiagnosticDescription(
+        "parsed_water_temp",
+        "Parsed water_temp",
+        lambda payload: parse_temperature(payload, "water_temp"),
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    ),
+    SabianaDiagnosticDescription("parsed_fan_setpoint", "Parsed fan_setpoint", lambda payload: payload.get("fan_setpoint") if payload else None),
+    SabianaDiagnosticDescription("parsed_actual_motor_speed", "Parsed actual_motor_speed", lambda payload: _parse_number(payload, "actual_motor_speed")),
+    SabianaDiagnosticDescription("parsed_raw_action_hex", "Parsed raw_action_hex", lambda payload: payload.get("raw_action_hex") if payload else None),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -95,7 +127,7 @@ async def async_setup_entry(
     entities = [
         SabianaDiagnosticSensor(coordinator, device_id, description)
         for device_id in coordinator.data.devices
-        for description in (*STATUS_SENSORS, *DIAGNOSTIC_SENSORS)
+        for description in (*STATUS_SENSORS, *DIAGNOSTIC_SENSORS, *PARSED_RESPONSE_SENSORS)
     ]
     async_add_entities(entities)
 
@@ -124,7 +156,7 @@ class SabianaDiagnosticSensor(SabianaCoordinatorEntity, SensorEntity):
         return f"{self._device_id}_{self.entity_description.key}"
 
     @property
-    def native_value(self) -> str | float | None:
+    def native_value(self) -> str | float | bool | None:
         """Return the decoded sensor value."""
         return self.entity_description.value_fn(self._last_data)
 
@@ -142,6 +174,19 @@ def _parse_fan_level(payload: dict | None) -> float | None:
     if value is None:
         return None
     if value == "AUTO":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_number(payload: dict[str, Any] | None, key: str) -> float | None:
+    """Return a numeric value from the parsed lastData dict."""
+    if not payload:
+        return None
+    value = payload.get(key)
+    if value is None:
         return None
     try:
         return float(value)
