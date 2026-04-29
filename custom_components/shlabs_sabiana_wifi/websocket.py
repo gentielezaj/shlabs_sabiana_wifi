@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import Callable
 
 from aiohttp import ClientError, WSMsgType
@@ -20,6 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 # Exponential backoff: 5 → 10 → 20 → 40 → ... capped at 300 seconds
 _INITIAL_BACKOFF = 5
 _MAX_BACKOFF = 300
+_BACKOFF_RESET_AFTER_SECONDS = 60
 
 # Socket.IO / Engine.IO packet type prefixes
 _EIO_PING = "2"
@@ -60,6 +62,10 @@ class SabianaWebSocketClient:
 
     def async_start(self) -> None:
         """Schedule the persistent WebSocket loop as an HA background task."""
+        if self._task and not self._task.done():
+            _LOGGER.debug("Sabiana WebSocket task already running")
+            return
+
         self._stop_event.clear()
         self._task = self._hass.async_create_background_task(
             self._run_forever(), "sabiana_websocket"
@@ -86,10 +92,9 @@ class SabianaWebSocketClient:
         """Reconnect loop with exponential backoff."""
         backoff = _INITIAL_BACKOFF
         while not self._stop_event.is_set():
-            connected_ok = False
+            connected_duration = 0.0
             try:
-                await self._connect()
-                connected_ok = True
+                connected_duration = await self._connect()
             except asyncio.CancelledError:
                 raise
             except (SabianaApiError, SabianaAuthError, ClientError, OSError) as err:
@@ -100,21 +105,18 @@ class SabianaWebSocketClient:
             if self._stop_event.is_set():
                 break
 
-            if connected_ok:
-                # Reset backoff after a successful long-lived connection
+            if connected_duration >= _BACKOFF_RESET_AFTER_SECONDS:
+                # Reset backoff only after a meaningfully stable connection.
                 backoff = _INITIAL_BACKOFF
             else:
-                # Double backoff on repeated failure
+                # Double backoff on repeated failures or short-lived connections.
                 backoff = min(backoff * 2, _MAX_BACKOFF)
 
             _LOGGER.debug(
                 "Sabiana WebSocket disconnected; reconnecting in %d seconds", backoff
             )
             try:
-                await asyncio.wait_for(
-                    asyncio.shield(asyncio.ensure_future(self._stop_event.wait())),
-                    timeout=backoff,
-                )
+                await asyncio.wait_for(self._stop_event.wait(), timeout=backoff)
             except asyncio.TimeoutError:
                 pass
 
@@ -122,9 +124,10 @@ class SabianaWebSocketClient:
     # Connection handshake + message loop
     # ------------------------------------------------------------------
 
-    async def _connect(self) -> None:
+    async def _connect(self) -> float:
         """Perform the Socket.IO handshake and run the receive loop."""
         session = async_get_clientsession(self._hass)
+        connected_at = time.monotonic()
 
         # Ensure we have a valid JWT before starting
         await self._client.async_ensure_authenticated()
@@ -142,6 +145,7 @@ class SabianaWebSocketClient:
         # ----------------------------------------------------------------
         handshake_url = (
             f"{WEBSOCKET_BASE_URL}/socket.io/?EIO=4&transport=polling"
+            f"&t={self._socketio_timestamp()}"
         )
         async with session.get(handshake_url, headers=base_headers) as resp:
             if resp.status != 200:
@@ -149,6 +153,7 @@ class SabianaWebSocketClient:
                     f"WebSocket handshake GET failed: HTTP {resp.status}"
                 )
             raw = await resp.text()
+        _LOGGER.debug("Sabiana WebSocket handshake raw response: %s", raw)
 
         # Engine.IO wraps the JSON in "0{...}"
         json_start = raw.find("{")
@@ -168,13 +173,19 @@ class SabianaWebSocketClient:
         # Step 2 – POST auth: send token as Socket.IO connect payload
         # ----------------------------------------------------------------
         auth_url = (
-            f"{WEBSOCKET_BASE_URL}/socket.io/?EIO=4&transport=polling&sid={sid}"
+            f"{WEBSOCKET_BASE_URL}/socket.io/?EIO=4&transport=polling"
+            f"&t={self._socketio_timestamp()}&sid={sid}"
         )
         auth_body = f'40{json.dumps({"token": token})}'
         auth_headers = {
             **base_headers,
             "Content-Type": "text/plain;charset=UTF-8",
         }
+        _LOGGER.debug(
+            "Sabiana WebSocket auth POST: sid=%s payload=%s",
+            sid,
+            '{"token":"<redacted>"}',
+        )
         async with session.post(
             auth_url, data=auth_body, headers=auth_headers
         ) as auth_resp:
@@ -188,6 +199,25 @@ class SabianaWebSocketClient:
                     f"WebSocket auth POST failed: HTTP {auth_resp.status}: {text}"
                 )
         _LOGGER.debug("Sabiana WebSocket auth POST accepted")
+
+        # Step 2b – Drain the polling connect ack before upgrading transport.
+        connect_ack_url = (
+            f"{WEBSOCKET_BASE_URL}/socket.io/?EIO=4&transport=polling"
+            f"&t={self._socketio_timestamp()}&sid={sid}"
+        )
+        async with session.get(connect_ack_url, headers=base_headers) as connect_resp:
+            if connect_resp.status != 200:
+                raise SabianaApiError(
+                    f"WebSocket auth ACK GET failed: HTTP {connect_resp.status}"
+                )
+            connect_ack = await connect_resp.text()
+        _LOGGER.debug("Sabiana WebSocket auth ACK response: %s", connect_ack)
+
+        if _SIO_CONNECT_ACK not in connect_ack:
+            _LOGGER.debug(
+                "Sabiana WebSocket auth ACK response did not include connect frame: %r",
+                connect_ack,
+            )
 
         # ----------------------------------------------------------------
         # Step 3 – Upgrade to WebSocket
@@ -206,6 +236,7 @@ class SabianaWebSocketClient:
 
             # Send probe to confirm transport upgrade
             await ws.send_str(_EIO_PROBE_REQUEST)
+            _LOGGER.debug("Sabiana WebSocket sent frame: %s", _EIO_PROBE_REQUEST)
 
             upgrade_confirmed = False
 
@@ -216,11 +247,13 @@ class SabianaWebSocketClient:
 
                 if msg.type == WSMsgType.TEXT:
                     data: str = msg.data
+                    _LOGGER.debug("Sabiana WebSocket received frame: %s", data)
 
                     if not upgrade_confirmed:
                         # Expect server probe response, then send upgrade packet
                         if data == _EIO_PROBE_RESPONSE:
                             await ws.send_str(_EIO_UPGRADE)
+                            _LOGGER.debug("Sabiana WebSocket sent frame: %s", _EIO_UPGRADE)
                             upgrade_confirmed = True
                             _LOGGER.debug("Sabiana WebSocket transport upgrade complete")
                         continue
@@ -228,10 +261,13 @@ class SabianaWebSocketClient:
                     if data == _EIO_PING:
                         # Engine.IO heartbeat – respond with pong
                         await ws.send_str(_EIO_PONG)
+                        _LOGGER.debug("Sabiana WebSocket sent frame: %s", _EIO_PONG)
 
                     elif data.startswith(_SIO_EVENT_PREFIX):
                         # Socket.IO event: "42[...]"
                         await self._handle_event(data[len(_SIO_EVENT_PREFIX):])
+                    else:
+                        _LOGGER.debug("Sabiana WebSocket unhandled text frame: %s", data)
 
                 elif msg.type in (WSMsgType.CLOSED, WSMsgType.CLOSING):
                     _LOGGER.debug("Sabiana WebSocket closed by server")
@@ -240,6 +276,8 @@ class SabianaWebSocketClient:
                 elif msg.type == WSMsgType.ERROR:
                     _LOGGER.warning("Sabiana WebSocket error frame: %s", msg.data)
                     break
+
+        return time.monotonic() - connected_at
 
     # ------------------------------------------------------------------
     # Event handling
@@ -272,3 +310,8 @@ class SabianaWebSocketClient:
                 "Sabiana WebSocket data event: device=%s data=%s", device_id, hex_data
             )
             self._on_device_data(device_id, hex_data)
+
+    @staticmethod
+    def _socketio_timestamp() -> str:
+        """Return a cache-busting value for Engine.IO polling requests."""
+        return str(time.time_ns())

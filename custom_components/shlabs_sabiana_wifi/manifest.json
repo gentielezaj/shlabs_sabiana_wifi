@@ -6,8 +6,8 @@
   "documentation": "https://github.com/gentielezaj/shlabs_sabiana_wifi",
   "issue_tracker": "https://github.com/gentielezaj/shlabs_sabiana_wifi/issues",
   "integration_type": "device",
-  "iot_class": "cloud_polling",
+  "iot_class": "cloud_push",
   "loggers": ["custom_components.shlabs_sabiana_wifi"],
   "requirements": [],
-  "version": "0.1.9"
+  "version": "0.1.10"
 }
