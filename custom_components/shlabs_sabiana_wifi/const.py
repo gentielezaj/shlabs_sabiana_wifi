@@ -3,6 +3,8 @@
 DOMAIN = "shlabs_sabiana_wifi"
 PLATFORMS = ["climate", "switch", "sensor"]
 
+ENTITY_PICTURE_URL = f"/{DOMAIN}/static/sabiana.webp"
+
 CONF_BASE_URL = "base_url"
 
 DEFAULT_NAME = "SHLabs Sabiana WiFi"
