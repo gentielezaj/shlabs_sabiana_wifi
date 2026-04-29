@@ -7,7 +7,7 @@ from typing import Any
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, ENTITY_PICTURE_URL, MANUFACTURER
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import SabianaDataUpdateCoordinator
 
 # Keys into the parsed lastData dict (from SabianaCloudWM.parse)
@@ -39,7 +39,6 @@ def parse_temperature(data: dict[str, Any] | None, key: str) -> float | None:
 class SabianaCoordinatorEntity(CoordinatorEntity[SabianaDataUpdateCoordinator]):
     """Base entity for Sabiana devices."""
 
-    _attr_entity_picture = ENTITY_PICTURE_URL
     def __init__(self, coordinator: SabianaDataUpdateCoordinator, device_id: str) -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
