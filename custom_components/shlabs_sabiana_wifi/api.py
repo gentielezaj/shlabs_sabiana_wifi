@@ -50,6 +50,16 @@ class SabianaApiClient:
         """Return the configured API base URL."""
         return str(self.entry.data[CONF_BASE_URL]).rstrip("/")
 
+    @property
+    def token(self) -> str | None:
+        """Return the current short-lived JWT, or None if not authenticated."""
+        return self._token
+
+    async def async_ensure_authenticated(self) -> None:
+        """Ensure a valid token exists, logging in if necessary."""
+        if not self._token:
+            await self.async_login()
+
     async def async_login(self) -> None:
         """Log in and cache tokens in memory."""
         payload = {

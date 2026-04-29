@@ -11,6 +11,10 @@ DEFAULT_NAME = "SHLabs Sabiana WiFi"
 DEFAULT_SCAN_INTERVAL = 60
 DEFAULT_BASE_URL = "https://be-standard.sabianawm.cloud"
 
+WEBSOCKET_BASE_URL = "https://be-flex.sabianawm.cloud"
+WEBSOCKET_WSS_URL = "wss://be-flex.sabianawm.cloud"
+WEBSOCKET_ORIGIN = "https://sabianawm.cloud"
+
 ATTR_RSSI = "rssi"
 ATTR_FIRMWARE = "firmware"
 

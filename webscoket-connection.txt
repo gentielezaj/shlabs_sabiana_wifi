@@ -1,0 +1,171 @@
+- request one
+
+https://be-flex.sabianawm.cloud/socket.io/?EIO=4&transport=polling&t=rus0evbb
+Headers
+Accept:
+*/*
+Accept-Encoding:
+gzip, deflate, br, zstd
+Accept-Language:
+en-US,en;q=0.9
+Connection:
+keep-alive
+Host:
+be-flex.sabianawm.cloud
+Origin:
+https://sabianawm.cloud
+Referer:
+https://sabianawm.cloud/
+sec-ch-ua:
+"Android WebView";v="147", "Not.A/Brand";v="8", "Chromium";v="147"
+sec-ch-ua-mobile:
+?1
+sec-ch-ua-platform:
+"Android"
+Sec-Fetch-Dest:
+empty
+Sec-Fetch-Mode:
+cors
+Sec-Fetch-Site:
+same-site
+User-Agent:
+Mozilla/5.0 (Linux; Android 10; SM-G960F Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/147.0.7727.55 Mobile Safari/537.36
+X-Requested-With:
+it.sabiana.cloud.wm
+
+reponse: 
+{
+  "sid": "9l0n5ddjFYgZmMJuAABR",
+  "upgrades": [
+    "websocket"
+  ],
+  "pingInterval": 25000,
+  "pingTimeout": 20000,
+  "maxPayload": 1000000
+}
+
+- request two
+Method: POST
+URL
+https://be-flex.sabianawm.cloud/socket.io/?EIO=4&transport=polling&t=rus7l3yi&sid=9l0n5ddjFYgZmMJuAABR
+Headers
+Accept:
+*/*
+Accept-Encoding:
+gzip, deflate, br, zstd
+Accept-Language:
+en-US,en;q=0.9
+Connection:
+keep-alive
+Content-Length:
+235
+Content-type:
+text/plain;charset=UTF-8
+Host:
+be-flex.sabianawm.cloud
+Origin:
+https://sabianawm.cloud
+Referer:
+https://sabianawm.cloud/
+sec-ch-ua:
+"Android WebView";v="147", "Not.A/Brand";v="8", "Chromium";v="147"
+sec-ch-ua-mobile:
+?1
+sec-ch-ua-platform:
+"Android"
+Sec-Fetch-Dest:
+empty
+Sec-Fetch-Mode:
+cors
+Sec-Fetch-Site:
+same-site
+User-Agent:
+Mozilla/5.0 (Linux; Android 10; SM-G960F Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/147.0.7727.55 Mobile Safari/537.36
+X-Requested-With:
+it.sabiana.cloud.wm
+
+body: {
+  "token": <token>
+}
+
+response: 200 OK
+
+- request three (dont know if needed)
+Method: GET
+URL
+https://be-flex.sabianawm.cloud/socket.io/?EIO=4&transport=polling&t=rus7ocjp&sid=9l0n5ddjFYgZmMJuAABR
+Headers
+Accept:
+*/*
+Accept-Encoding:
+gzip, deflate, br, zstd
+Accept-Language:
+en-US,en;q=0.9
+Connection:
+keep-alive
+Host:
+be-flex.sabianawm.cloud
+Origin:
+https://sabianawm.cloud
+Referer:
+https://sabianawm.cloud/
+sec-ch-ua:
+"Android WebView";v="147", "Not.A/Brand";v="8", "Chromium";v="147"
+sec-ch-ua-mobile:
+?1
+sec-ch-ua-platform:
+"Android"
+Sec-Fetch-Dest:
+empty
+Sec-Fetch-Mode:
+cors
+Sec-Fetch-Site:
+same-site
+User-Agent:
+Mozilla/5.0 (Linux; Android 10; SM-G960F Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/147.0.7727.55 Mobile Safari/537.36
+X-Requested-With:
+it.sabiana.cloud.wm
+
+response: {
+  "sid": "unh0w3pIC-9jaO_8AABS"
+}
+
+websocket connection
+Method: GET
+URL
+wss://be-flex.sabianawm.cloud/socket.io/?EIO=4&transport=websocket&sid=9l0n5ddjFYgZmMJuAABR
+Headers
+Accept-Encoding:
+gzip, deflate, br, zstd
+Accept-Language:
+en-US,en;q=0.9
+Cache-Control:
+no-cache
+Connection:
+Upgrade
+Host:
+be-flex.sabianawm.cloud
+Origin:
+https://sabianawm.cloud
+Pragma:
+no-cache
+Sec-WebSocket-Extensions:
+permessage-deflate; client_max_window_bits
+Sec-WebSocket-Key:
+TB6SujZ1qHsE3Qt4ICju5Q==
+Sec-WebSocket-Version:
+13
+Upgrade:
+websocket
+User-Agent:
+Mozilla/5.0 (Linux; Android 10; SM-G960F Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/147.0.7727.55 Mobile Safari/537.36
+
+where we send sometimes a message like number 5 only number, and server also sends numbers like 2 or 5
+but on update the response we need is like this
+[
+  "data",
+  {
+    "device": "swm-CCDBA774ED66",
+    "data": "5020003F04000160000000CB00F500BE00B4C800C800001400000753012D00200000000200000000"
+  }
+]
