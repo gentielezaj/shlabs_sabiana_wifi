@@ -1,6 +1,8 @@
 import sys
 import json
-from custom_components.shlabs_sabiana_wifi.lastdate_decoder import SabianaCloudWM
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "custom_components", "shlabs_sabiana_wifi"))
+from lastdate_decoder import SabianaCloudWM
 
 def run_test():
     # 1. Check for command line argument

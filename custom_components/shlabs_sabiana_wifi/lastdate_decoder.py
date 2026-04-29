@@ -11,25 +11,39 @@ class SabianaCloudWM:
 
         # Byte 7: Action & Night Mode
         action_byte = data[7]
+        
+        # 1. NIGHT MODE: Bit 7 (0x80) is the Night Mode toggle
         night_mode = bool(action_byte & 0x80)
+        
+        # 2. POWER STATUS: Strip the Night Mode bit for state comparison
         base_action = action_byte & 0x7F
         
-        if base_action == 0x60:
+        # Fix: Specifically check raw action_byte for OFF codes (0x40, 0x60)
+        # to prevent collisions with active Night Mode states like 0xE0.
+        if action_byte in [0x40, 0x60]:
             power_status, is_on = "OFF", False
         elif base_action in [0x61, 0x63]:
             power_status, is_on = "IDLE", True
         else:
             power_status, is_on = "RUNNING", True
 
-        # Byte 4: Fan Setpoint
+        # Byte 4: Fan Setpoint (Values < 20 are interpreted as AUTO)
         fan_raw = data[4]
         fan_setpoint = "AUTO" if fan_raw < 20 else (fan_raw - 10) / 10.0
 
-        # Extract Other Values
+        # Mode Mapping (Byte 5)
         mode = {0: "Cooling", 1: "Heating", 3: "Fan Only"}.get(data[5], "Unknown")
+
+        # Temperature Logic
         room_temp = data[11] / 10.0
+        
+        # Target Temperature: 16-bit Big Endian at Indices 14 and 15
         target_temp = ((data[14] << 8) | data[15]) / 10.0
+        
+        # Water Temperature: Verified at Index 17
         water_temp = data[17] / 10.0
+        
+        # Actual Motor Speed: Index 23
         actual_motor = (data[23] - 10) / 10.0
 
         return {
