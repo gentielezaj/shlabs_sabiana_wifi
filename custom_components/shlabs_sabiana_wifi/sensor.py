@@ -39,6 +39,7 @@ class SabianaDiagnosticDescription:
     diagnostic: bool = True
     device_class: SensorDeviceClass | None = None
     native_unit_of_measurement: str | None = None
+    suggested_unit_of_measurement: str | None = None
 
 
 STATUS_SENSORS: tuple[SabianaDiagnosticDescription, ...] = (
