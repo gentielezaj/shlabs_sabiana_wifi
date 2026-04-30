@@ -18,9 +18,9 @@ from .const import APP_ID_HEADER, WEBSOCKET_BASE_URL, WEBSOCKET_ORIGIN, WEBSOCKE
 
 _LOGGER = logging.getLogger(__name__)
 
-# Exponential backoff: 5 → 10 → 20 → 40 → ... capped at 300 seconds
+# Exponential backoff: 5 -> 10 -> 20 -> 40 -> ... capped at 1 hour
 _INITIAL_BACKOFF = 5
-_MAX_BACKOFF = 300
+_MAX_BACKOFF = 3600
 _BACKOFF_RESET_AFTER_SECONDS = 60
 
 # Socket.IO / Engine.IO packet type prefixes
